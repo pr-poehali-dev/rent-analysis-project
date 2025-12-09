@@ -18,6 +18,10 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
+const API_SERVICES = 'https://functions.poehali.dev/d7cbb1b1-5a1d-427f-a20f-d84af8a8ede9';
+const API_ORDERS = 'https://functions.poehali.dev/adc8619a-328d-4b31-88bb-b59be3455420';
+const API_REVIEWS = 'https://functions.poehali.dev/018fbcbd-1f21-467b-bc14-b163e8eccf97';
+
 interface Service {
   id: number;
   title: string;
@@ -46,6 +50,16 @@ interface Video {
   views: number;
 }
 
+interface Review {
+  id: number;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  phone_model: string;
+  is_published: boolean;
+  created_at: string;
+}
+
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState('');
@@ -53,7 +67,9 @@ const Admin = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState({ unlocks: 1000, clients: 500, successRate: 99.5 });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = (e: React.FormEvent) => {
@@ -67,101 +83,83 @@ const Admin = () => {
     }
   };
 
-  const loadData = () => {
-    const mockServices: Service[] = [
-      {
-        id: 1,
-        title: 'Разблокировка Mi Account',
-        description: 'Удаление аккаунта Xiaomi',
-        price: 1500,
-        icon: 'Smartphone',
-        category: 'unlock',
-        is_active: true,
-      },
-      {
-        id: 2,
-        title: 'Разблокировка Google FRP',
-        description: 'Bypass FRP на Android',
-        price: 1200,
-        icon: 'Shield',
-        category: 'unlock',
-        is_active: true,
-      },
-      {
-        id: 3,
-        title: 'Активация ПО',
-        description: 'Активация программ',
-        price: 800,
-        icon: 'Settings',
-        category: 'software',
-        is_active: true,
-      },
-    ];
-    setServices(mockServices);
-
-    const mockOrders: Order[] = [
-      {
-        id: 1,
-        customer_name: 'Иван Петров',
-        customer_phone: '+7 999 123-45-67',
-        phone_model: 'Xiaomi Redmi Note 10',
-        status: 'new',
-        created_at: '2024-12-10T10:30:00',
-      },
-      {
-        id: 2,
-        customer_name: 'Мария Сидорова',
-        customer_phone: '+7 999 765-43-21',
-        phone_model: 'Samsung Galaxy A52',
-        status: 'in_progress',
-        created_at: '2024-12-10T09:15:00',
-      },
-      {
-        id: 3,
-        customer_name: 'Алексей Иванов',
-        customer_phone: '+7 999 888-99-00',
-        phone_model: 'Realme 9 Pro',
-        status: 'completed',
-        created_at: '2024-12-09T15:45:00',
-      },
-    ];
-    setOrders(mockOrders);
-
-    const mockVideos: Video[] = [
-      {
-        id: 1,
-        title: 'TECNO SPARK GO 2 Android 15',
-        phone_model: 'TECNO SPARK GO 2',
-        video_url: 'https://youtube.com/watch?v=example1',
-        thumbnail_url: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400',
-        views: 1250,
-      },
-      {
-        id: 2,
-        title: 'INFINIX NOTE 40 FRP',
-        phone_model: 'INFINIX NOTE 40',
-        video_url: 'https://youtube.com/watch?v=example2',
-        thumbnail_url: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=400',
-        views: 890,
-      },
-    ];
-    setVideos(mockVideos);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [servicesRes, ordersRes, reviewsRes] = await Promise.all([
+        fetch(API_SERVICES + '?all=true'),
+        fetch(API_ORDERS),
+        fetch(API_REVIEWS + '?all=true')
+      ]);
+      
+      const [servicesData, ordersData, reviewsData] = await Promise.all([
+        servicesRes.json(),
+        ordersRes.json(),
+        reviewsRes.json()
+      ]);
+      
+      setServices(servicesData.services || []);
+      setOrders(ordersData.orders || []);
+      setReviews(reviewsData.reviews || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Ошибка загрузки данных');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdateStats = () => {
     toast.success('Статистика обновлена');
   };
 
-  const handleDeleteOrder = (id: number) => {
-    setOrders(orders.filter((o) => o.id !== id));
-    toast.success('Заказ удалён');
+  const handleDeleteOrder = async (id: number) => {
+    try {
+      await fetch(API_ORDERS + `?id=${id}`, { method: 'DELETE' });
+      setOrders(orders.filter((o) => o.id !== id));
+      toast.success('Заказ удалён');
+    } catch (error) {
+      toast.error('Ошибка удаления заказа');
+    }
   };
 
-  const handleChangeOrderStatus = (id: number, newStatus: string) => {
-    setOrders(
-      orders.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
-    );
-    toast.success('Статус изменён');
+  const handleChangeOrderStatus = async (id: number, newStatus: string) => {
+    try {
+      await fetch(API_ORDERS, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus })
+      });
+      setOrders(orders.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
+      toast.success('Статус изменён');
+    } catch (error) {
+      toast.error('Ошибка изменения статуса');
+    }
+  };
+
+  const handlePublishReview = async (id: number, isPublished: boolean) => {
+    try {
+      await fetch(API_REVIEWS, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_published: isPublished })
+      });
+      setReviews(reviews.map((r) => (r.id === id ? { ...r, is_published: isPublished } : r)));
+      toast.success(isPublished ? 'Отзыв опубликован' : 'Отзыв скрыт');
+      loadData();
+    } catch (error) {
+      toast.error('Ошибка модерации отзыва');
+    }
+  };
+
+  const handleDeleteReview = async (id: number) => {
+    try {
+      await fetch(API_REVIEWS + `?id=${id}`, { method: 'DELETE' });
+      setReviews(reviews.filter((r) => r.id !== id));
+      toast.success('Отзыв удалён');
+    } catch (error) {
+      toast.error('Ошибка удаления отзыва');
+    }
   };
 
   if (!isAuthenticated) {
@@ -317,6 +315,15 @@ const Admin = () => {
             <TabsTrigger value="videos" className="gap-2">
               <Icon name="Video" size={18} />
               Видео
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="gap-2">
+              <Icon name="MessageSquare" size={18} />
+              Отзывы
+              {reviews.filter((r) => !r.is_published).length > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {reviews.filter((r) => !r.is_published).length}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Icon name="Sliders" size={18} />
@@ -488,6 +495,91 @@ const Admin = () => {
                     </Card>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            <Card>
+              <CardHeader>
+                <CardTitle>Модерация отзывов</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Клиент</TableHead>
+                      <TableHead>Оценка</TableHead>
+                      <TableHead>Отзыв</TableHead>
+                      <TableHead>Модель</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead>Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reviews.map((review) => (
+                      <TableRow key={review.id}>
+                        <TableCell className="font-medium">{review.customer_name}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Icon
+                                key={i}
+                                name="Star"
+                                size={14}
+                                className={
+                                  i < review.rating
+                                    ? 'text-yellow-500 fill-yellow-500'
+                                    : 'text-gray-300'
+                                }
+                              />
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{review.comment}</TableCell>
+                        <TableCell>{review.phone_model}</TableCell>
+                        <TableCell>
+                          {review.is_published ? (
+                            <Badge className="bg-green-500">Опубликован</Badge>
+                          ) : (
+                            <Badge variant="secondary">На модерации</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {!review.is_published && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePublishReview(review.id, true)}
+                              >
+                                <Icon name="Check" size={16} className="mr-1" />
+                                Опубликовать
+                              </Button>
+                            )}
+                            {review.is_published && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePublishReview(review.id, false)}
+                              >
+                                <Icon name="X" size={16} className="mr-1" />
+                                Скрыть
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteReview(review.id)}
+                            >
+                              <Icon name="Trash2" size={16} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>

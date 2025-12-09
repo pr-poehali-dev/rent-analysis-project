@@ -24,10 +24,25 @@ interface Video {
   video_url: string;
 }
 
+interface Review {
+  id: number;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  phone_model: string;
+  created_at: string;
+}
+
+const API_SERVICES = 'https://functions.poehali.dev/d7cbb1b1-5a1d-427f-a20f-d84af8a8ede9';
+const API_ORDERS = 'https://functions.poehali.dev/adc8619a-328d-4b31-88bb-b59be3455420';
+const API_REVIEWS = 'https://functions.poehali.dev/018fbcbd-1f21-467b-bc14-b163e8eccf97';
+
 const HomePage = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [selectedService, setSelectedService] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -35,64 +50,28 @@ const HomePage = () => {
     phoneModel: '',
     message: '',
   });
+  const [reviewForm, setReviewForm] = useState({
+    name: '',
+    rating: 5,
+    comment: '',
+    phoneModel: '',
+  });
 
   useEffect(() => {
     loadServices();
     loadVideos();
+    loadReviews();
   }, []);
 
   const loadServices = async () => {
-    const mockServices: Service[] = [
-      {
-        id: 1,
-        title: 'Разблокировка Mi Account',
-        description: 'Удаление аккаунта Xiaomi с телефона любой модели',
-        price: 1500,
-        icon: 'Smartphone',
-        category: 'unlock',
-      },
-      {
-        id: 2,
-        title: 'Разблокировка Google Account (FRP)',
-        description: 'Bypass Factory Reset Protection на Android устройствах',
-        price: 1200,
-        icon: 'Shield',
-        category: 'unlock',
-      },
-      {
-        id: 3,
-        title: 'Активация ПО',
-        description: 'Активация и настройка программного обеспечения для работы',
-        price: 800,
-        icon: 'Settings',
-        category: 'software',
-      },
-      {
-        id: 4,
-        title: 'Пополнение кредитов',
-        description: 'Быстрое пополнение кредитов для программ разблокировки',
-        price: 500,
-        icon: 'CreditCard',
-        category: 'credits',
-      },
-      {
-        id: 5,
-        title: 'Удалённая разблокировка',
-        description: 'Разблокировка телефона удалённо через TeamViewer',
-        price: 2000,
-        icon: 'Wifi',
-        category: 'remote',
-      },
-      {
-        id: 6,
-        title: 'Прошивка телефона',
-        description: 'Установка официальной или кастомной прошивки',
-        price: 1000,
-        icon: 'Download',
-        category: 'firmware',
-      },
-    ];
-    setServices(mockServices);
+    try {
+      const response = await fetch(API_SERVICES);
+      const data = await response.json();
+      setServices(data.services || []);
+    } catch (error) {
+      console.error('Error loading services:', error);
+      toast.error('Не удалось загрузить услуги');
+    }
   };
 
   const loadVideos = async () => {
@@ -143,10 +122,75 @@ const HomePage = () => {
     setVideos(mockVideos);
   };
 
+  const loadReviews = async () => {
+    try {
+      const response = await fetch(API_REVIEWS);
+      const data = await response.json();
+      setReviews(data.reviews || []);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Заявка отправлена! Мы свяжемся с вами в ближайшее время.');
-    setFormData({ name: '', phone: '', email: '', phoneModel: '', message: '' });
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch(API_ORDERS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: formData.name,
+          customer_phone: formData.phone,
+          customer_email: formData.email,
+          phone_model: formData.phoneModel,
+          message: formData.message,
+          service_id: selectedService
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Заявка отправлена! Мы свяжемся с вами в ближайшее время.');
+        setFormData({ name: '', phone: '', email: '', phoneModel: '', message: '' });
+        setSelectedService(null);
+      } else {
+        toast.error('Ошибка при отправке заявки');
+      }
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      toast.error('Не удалось отправить заявку. Попробуйте позже.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const response = await fetch(API_REVIEWS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: reviewForm.name,
+          rating: reviewForm.rating,
+          comment: reviewForm.comment,
+          phone_model: reviewForm.phoneModel
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success('Спасибо за отзыв! Он появится после модерации.');
+        setReviewForm({ name: '', rating: 5, comment: '', phoneModel: '' });
+      }
+    } catch (error) {
+      toast.error('Не удалось отправить отзыв');
+    }
   };
 
   return (
@@ -316,6 +360,105 @@ const HomePage = () => {
         </div>
       </section>
 
+      <section className="py-20 bg-gradient-to-b from-white to-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h3 className="text-4xl font-bold mb-4">Отзывы клиентов</h3>
+            <p className="text-lg text-muted-foreground">
+              Реальные отзывы наших клиентов
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+            {reviews.slice(0, 6).map((review, index) => (
+              <Card key={review.id} className="p-6 animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-xl font-bold text-primary">
+                      {review.customer_name.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">{review.customer_name}</h4>
+                    <div className="flex gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Icon
+                          key={i}
+                          name="Star"
+                          size={14}
+                          className={i < review.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">{review.comment}</p>
+                <Badge variant="outline" className="text-xs">
+                  {review.phone_model}
+                </Badge>
+              </Card>
+            ))}
+          </div>
+          
+          <Card className="max-w-2xl mx-auto p-6">
+            <h4 className="text-xl font-bold mb-4">Оставить отзыв</h4>
+            <form onSubmit={handleReviewSubmit} className="space-y-4">
+              <div>
+                <Input
+                  placeholder="Ваше имя"
+                  value={reviewForm.name}
+                  onChange={(e) => setReviewForm({ ...reviewForm, name: e.target.value })}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Оценка</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                      className="focus:outline-none"
+                    >
+                      <Icon
+                        name="Star"
+                        size={32}
+                        className={
+                          star <= reviewForm.rating
+                            ? 'text-yellow-500 fill-yellow-500'
+                            : 'text-gray-300'
+                        }
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Input
+                  placeholder="Модель телефона"
+                  value={reviewForm.phoneModel}
+                  onChange={(e) => setReviewForm({ ...reviewForm, phoneModel: e.target.value })}
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <Textarea
+                  placeholder="Ваш отзыв"
+                  value={reviewForm.comment}
+                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                  required
+                  rows={4}
+                />
+              </div>
+              <Button type="submit" size="lg" className="w-full h-12">
+                Отправить отзыв
+              </Button>
+            </form>
+          </Card>
+        </div>
+      </section>
+
       <section id="contact" className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
@@ -362,8 +505,8 @@ const HomePage = () => {
                       rows={4}
                     />
                   </div>
-                  <Button type="submit" size="lg" className="w-full h-12">
-                    Отправить заявку
+                  <Button type="submit" size="lg" className="w-full h-12" disabled={isSubmitting}>
+                    {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
                   </Button>
                 </form>
               </Card>

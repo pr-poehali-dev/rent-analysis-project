@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Get published reviews",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "reviews": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create new review",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "customer_name": "Иван Петров",
+        "rating": 5,
+        "comment": "Отлично разблокировали Mi Account, быстро и качественно!",
+        "phone_model": "Xiaomi Redmi Note 10"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "review_id": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

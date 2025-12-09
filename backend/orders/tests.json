@@ -1,0 +1,32 @@
+{
+  "tests": [
+    {
+      "name": "Get all orders",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "orders": "array"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create new order",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "customer_name": "Test User",
+        "customer_phone": "+79991234567",
+        "customer_email": "test@example.com",
+        "phone_model": "Xiaomi Redmi Note 10",
+        "message": "Не могу разблокировать Mi Account"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "order_id": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
